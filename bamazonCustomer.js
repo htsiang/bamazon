@@ -1,6 +1,4 @@
-require("dotenv").config();
 var keys = require("./keys.js");
-console.log(keys);
 var inquirer = require("inquirer");
 var mysql = require("mysql");
 
@@ -17,8 +15,6 @@ connection.connect(function(err) {
     console.log("connected as id " + connection.threadId + "\n");
 
     displayAllProducts();
-
-    askUser();
 });
 
 // display table of all products, including id, names & prices
@@ -29,13 +25,18 @@ function displayAllProducts() {
         if (error) throw error;
 
         //console.log(response);
+
+        // headers for table
         console.log("Item ID | Product | Department | Price | In Stock");
 
+        // displays information in table format
         for(var i=0; i<response.length; i++) {
             console.log(response[i].item_id + " | " + response[i].product_name + " | " + response[i].department_name + " | " + response[i].price + " | " + response[i].stock_quantity);
         };
         
         console.log("\n");
+
+        askUser();
     });
 };
 
@@ -65,7 +66,7 @@ function askUser() {
 
             checkStock(response.id, response.amount);
         }
-        else {
+        else { // if user does not confirm, ask if they want to re-input answers
             inquirer.prompt([
                 {
                     type: "confirm",
@@ -74,8 +75,11 @@ function askUser() {
                     default: true
                 }
             ]).then(function(res) {
-                if(res.again) {
+                if(res.again) { // if user wants to re-input answers, re-run function
                     askUser();
+                }
+                else { // if they don't want to re-input answers, end program
+                    connection.end();
                 };
             });
         };
@@ -96,12 +100,12 @@ function checkStock(itemID, purchaseAmount) {
 
             totalCost(res[0].price, purchaseAmount);
 
-            displayAllProducts();
-
             connection.end();
         }
-        else {
+        else { // if not enough stock, end program
             console.log("Insufficient quantity!");
+
+            connection.end();
         };
     });
 };
@@ -110,6 +114,7 @@ function checkStock(itemID, purchaseAmount) {
 function fulfillOrder(stockAmount, purchaseAmount, productID) {
     console.log("Your order will now be fulfilled.");
 
+    //query mysql to update new stock amount after user has purchased the purchaseAmount
     connection.query(
         "UPDATE products SET ? WHERE ?",
         [
@@ -122,9 +127,24 @@ function fulfillOrder(stockAmount, purchaseAmount, productID) {
             console.log(res.affectedRows + " products updated! \n");
         }
     );
+
+    // display the updated product
+    connection.query("SELECT * FROM products WHERE item_id = ?", productID, function(err, response) {
+        if (err) throw err;
+
+        // console.log(response);
+
+        // table headers
+        console.log("Item ID | Product | Department | Price | In Stock");
+
+        // show updated line in table format
+        for(var i=0; i<response.length; i++) {
+            console.log(response[i].item_id + " | " + response[i].product_name + " | " + response[i].department_name + " | " + response[i].price + " | " + response[i].stock_quantity);
+        };
+    });
 };
 
 // display total cost of purchase
 function totalCost(productPrice, purchaseAmount) {
-    console.log("Total Cost of Purchase: " + productPrice*purchaseAmount);
+    console.log("Total Cost of Purchase: $" + productPrice*purchaseAmount);
 };
